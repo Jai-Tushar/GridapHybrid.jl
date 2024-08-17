@@ -25,6 +25,7 @@ export get_cell_normal_vector
 include("SkeletonArrays.jl")
 include("Skeleton.jl")
 export Skeleton
+export SkeletonGlue
 
 include("HybridAffineFEOperators.jl")
 export HybridAffineFEOperator
