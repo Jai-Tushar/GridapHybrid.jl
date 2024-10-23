@@ -584,6 +584,17 @@ function _get_cell_normal_vector(model,glue,cell_lface_to_nref::Function,sign_fl
   #Fields.MemoArray(face_s_n)
 end
 
+"""
+  - face_to_shapefuns: For each triangulation face, return a lagrangian basis on the ref space.
+  - cell_to_lface_to_shapefuns: For each cell, return an array such that for each local face returns 
+                                a lagrangian basis on the ref space.
+  - cell_lface_to_q_vertex_coords: For each cell, return an array such that for each local face return
+                                the coordinates of the nodes in that face.
+  - Output: For each cell, an array such that for each local face returns a map 
+            from the reference space on that face to the physical face.
+        
+          [cell][lface] -> linear_combination(basis,nodes)
+"""
 function _setup_tcell_lface_mface_map(d,model,glue)
   ctype_to_lface_to_pindex_to_qcoords=Gridap.Geometry._compute_face_to_q_vertex_coords_body(d,model,glue)
   cell_lface_to_q_vertex_coords = SkeletonCompressedVector(
@@ -611,6 +622,20 @@ function _setup_tcell_lface_mface_map(d,model,glue)
            cell_to_lface_to_shapefuns)
 end
 
+"""
+  Input: Face-wise array 
+    f_1 -> x_1
+    ...
+    f_n -> x_n
+  Output: Cell-wise array of local-face-wise arrays
+    c_1 -> [f(x_1), f(x_2), f(x_3), f(x_4)]
+    ...
+    c_m -> [..., f(x_n)]
+  where we assume we have a cell-to-face map 
+    c_1 -> [f_1, f_2, f_3, f_4]
+    ...
+    c_m -> [ ... f_n]
+"""
 function transform_face_to_cell_lface_array(glue,
                                             face_array::Gridap.Arrays.CompressedArray,
                                             f::Function=identity)
