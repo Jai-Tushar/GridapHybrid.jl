@@ -3,6 +3,8 @@ using Base: _Set, ArithmeticRounds
 using Gridap
 using FillArrays
 using LinearAlgebra
+using GridapDistributed
+using PartitionedArrays
 
 using Gridap.Fields
 include("StaticCondensationMap.jl")
@@ -36,5 +38,8 @@ include("HybridLinearSolvers.jl")
 
 include("GridapAPIExtensions.jl")
 include("GridapTmpModifications.jl")
+
+# Distributed machinery
+include("HybridDistributed.jl")
 
 end # module

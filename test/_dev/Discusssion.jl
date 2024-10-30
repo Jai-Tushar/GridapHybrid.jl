@@ -71,6 +71,7 @@ xh = get_trial_fe_basis(M)
 
 c = ∫(xh⋅yh)d∂K
 
+
 cell_dof_ids = map(get_cell_dof_ids,local_views(M),local_views(∂K))
 
 ∂K2 = GridapHybrid.Skeleton(model.models.items[1])
@@ -78,3 +79,27 @@ V1 = V.spaces.items[1]
 M1 = M.spaces.items[1]
 get_cell_dof_ids(M1,∂K2)
 
+reffeᵤ = ReferenceFE(lagrangian,VectorValue{D,Float64},order;space=:P)
+reffeₚ = ReferenceFE(lagrangian,Float64,order-1;space=:P)
+reffeₗ = ReferenceFE(lagrangian,Float64,order;space=:P)
+
+V = TestFESpace(Ω  , reffeᵤ; conformity=:L2)
+Q = TestFESpace(Ω  , reffeₚ; conformity=:L2)
+M = TestFESpace(Γ,
+                reffeₗ;
+                conformity=:L2,
+                dirichlet_tags=collect(5:8))
+Y = MultiFieldFESpace([V,Q,M])
+
+U = TrialFESpace(V)
+P = TrialFESpace(Q)
+L = TrialFESpace(M,p)
+X = MultiFieldFESpace([U, P, L])
+
+# degree = 2*(order+1)
+# d∂K    = Measure(∂K,degree)
+
+# yh = get_fe_basis(Y);
+# xh = get_trial_fe_basis(X);
+
+# (∇⋅vh)*ph

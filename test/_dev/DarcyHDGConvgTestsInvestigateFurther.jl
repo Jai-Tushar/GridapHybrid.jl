@@ -36,13 +36,11 @@ using Gridap.Geometry
 using GridapHybrid
 using Plots
 
-include("Visualize.jl")
-
 p(x) = sin(2*π*x[1])*sin(2*π*x[2])*x[1]*(x[1]-1)*x[2]*(x[2]-1)   # ex 1: g = 0 
 # p(x) = sin(2*π*x[1])*sin(2*π*x[2]) # ex 2: u ⋅ n = g   (To Do) # ex 2: g non-zero
 u(x) = -∇(p)(x)
-
-function solve_darcy_hdg((n,n),order)
+n = 4
+# function solve_darcy_hdg((n,n),order)
     # Geometry
     partition = (0,1,0,1)
     cells = (n,n)
@@ -103,8 +101,8 @@ function solve_darcy_hdg((n,n),order)
     #                           ∫(τ*mh*ph*(n⋅nₒ))d∂K +
     #                           ∫(τ*mh*lh*(n⋅nₒ))d∂K
 
-    a((uh,ph,lh),(vh,qh,mh)) =∫( vh⋅uh - (∇⋅vh)*ph - ∇(qh)⋅uh )dΩ +    
-                              ∫((vh⋅n)*lh)d∂K +                        
+    a((uh,ph,lh),(vh,qh,mh)) =∫( vh⋅uh - (∇⋅vh)*ph - ∇(qh)⋅uh )dΩ +    # This form gives a MatrixBlock{Matrix{VectorValue{2, Float64}}}
+                              ∫((vh⋅n)*lh)d∂K +                        # compared to the above commented out form.
                               ∫(qh*(uh⋅n))d∂K -                        
                               ∫(τ*qh*ph)d∂K +                   
                               ∫(τ*qh*lh)d∂K +                   
@@ -120,9 +118,9 @@ function solve_darcy_hdg((n,n),order)
     uh, ph, _ = xh
     e = p - ph
     
-    return sqrt(sum(∫(e⋅e)dΩ))
+  #   return sqrt(sum(∫(e⋅e)dΩ))
 
-  end
+  # end
   
   function conv_test(ns,order)
     el2 = Float64[]
@@ -146,15 +144,15 @@ function solve_darcy_hdg((n,n),order)
   end
 
   # ns=[8,16,32,64,128]
-  ns=[8,16,32,64]
-  order=2
-  el, hs = conv_test(ns,order)
-  println("Slope L2-norm u: $(slope(hs,el))")
-  slopek  =[Float64(ni)^(-(order)) for ni in ns]
-  display(plot(hs,[el slopek],
-    xaxis=:log, yaxis=:log,
-    label=["L2u (measured)" "slope k"],
-    shape=:auto,
-    xlabel="h",ylabel="L2 error",legend=:bottomright))
+  ns=[8,16,32]
+  order=1
+  # el, hs = conv_test(ns,order)
+  # println("Slope L2-norm u: $(slope(hs,el))")
+  # slopek  =[Float64(ni)^(-(order)) for ni in ns]
+  # display(plot(hs,[el slopek],
+  #   xaxis=:log, yaxis=:log,
+  #   label=["L2u (measured)" "slope k"],
+  #   shape=:auto,
+  #   xlabel="h",ylabel="L2 error",legend=:bottomright))
 
-end # modulez
+# end # modulez

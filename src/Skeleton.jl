@@ -204,7 +204,7 @@ end
 
 function Geometry.best_target(a::BodyFittedTriangulation{Dca},
                               b::BodyFittedTriangulation{Dcb}) where {Dca,Dcb}
-  @assert Dca==Dcb-1 || Dca-1==Dcb
+  @assert Dca==Dcb-1 || Dca-1==Dcb  
   @assert get_background_model(a)===get_background_model(b)
   Skeleton(get_background_model(a))
 end

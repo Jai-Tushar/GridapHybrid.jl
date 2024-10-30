@@ -1,65 +1,65 @@
 struct HybridAffineFEOperator{TB,TS} <: FEOperator
     weakform::Function
-    trial::MultiFieldFESpace
-    test::MultiFieldFESpace
+    trial::Union{MultiFieldFESpace, GridapDistributed.DistributedMultiFieldFESpace}
+    test::Union{MultiFieldFESpace, GridapDistributed.DistributedMultiFieldFESpace}
     bulk_fields::TB
     skeleton_fields::TS
-    skeleton_op::AffineFEOperator
+    skeleton_op::Union{AffineFEOperator, AbstractArray{AffineFEOperator}}
 end
 
 function HybridAffineFEOperator(
-  weakform::Function,
-  trial::MultiFieldFESpace,
-  test::MultiFieldFESpace,
-  bulk_fields::TB,
-  skeleton_fields::TS) where {TB <: Vector{<:Integer},TS <: Vector{<:Integer}}
-
-  # Invoke weak form of the hybridizable system
+    weakform::Function,
+    trial::MultiFieldFESpace,
+    test::MultiFieldFESpace,
+    bulk_fields::TB,
+    skeleton_fields::TS) where {TB <: Vector{<:Integer},TS <: Vector{<:Integer}}
+  
+    # Invoke weak form of the hybridizable system
     u = get_trial_fe_basis(trial)
     v = get_fe_basis(test)
     biform, liform  = weakform(u, v)
-
-  # Transform DomainContribution objects of the hybridizable system into a
-  # suitable form for assembling the linear system defined on the skeleton
-  # (i.e., the hybrid system)
-    obiform, oliform = _merge_bulk_and_skeleton_contributions(biform, liform)
-
-  # Pair LHS and RHS terms associated to SkeletonTriangulation
-    matvec, mat, vec = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
-
-  # Add StaticCondensationMap to matvec terms
-    matvec = _add_static_condensation(matvec, bulk_fields, skeleton_fields)
-
+  
     M, L = _setup_fe_spaces_skeleton_system(trial, test, skeleton_fields)
-
+      
+    # Transform DomainContribution objects of the hybridizable system into a
+    # suitable form for assembling the linear system defined on the skeleton
+    # (i.e., the hybrid system)
+      
+    obiform, oliform = _merge_bulk_and_skeleton_contributions(biform, liform)
+    # Pair LHS and RHS terms associated to SkeletonTriangulation
+    matvec, mat, vec = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
+    # Add StaticCondensationMap to matvec terms
+    matvec = _add_static_condensation(matvec, bulk_fields, skeleton_fields)
+  
     if (length(skeleton_fields) != 1)
         matvec = _block_skeleton_system_contributions(matvec, L)
-    end
-    assem = SparseMatrixAssembler(M, L)
+     end
+  
 
-  # Attach strong imposition of Dirichlet BCs
     uhd = zero(M)
     matvec, mat = Gridap.FESpaces._attach_dirichlet(matvec, mat, uhd)
-
+  
     data = Gridap.FESpaces._collect_cell_matrix_and_vector(M, L, matvec, mat, vec)
 
-    A, b = assemble_matrix_and_vector(assem, data)
-
-    skeleton_op = AffineFEOperator(M, L, A, b)
-    HybridAffineFEOperator(weakform, trial, test, bulk_fields, skeleton_fields, skeleton_op)
-end
-
+  
+      assem = SparseMatrixAssembler(M, L)
+      A, b = assemble_matrix_and_vector(assem, data)
+  
+      skeleton_op = AffineFEOperator(M, L, A, b)
+      HybridAffineFEOperator(weakform, trial, test, bulk_fields, skeleton_fields, skeleton_op)
+  end
+  
 function _setup_fe_spaces_skeleton_system(trial, test, skeleton_fields)
-    if (length(skeleton_fields) == 1)
-    # Single-field skeleton system
-        M = trial[skeleton_fields[1]]
-        L = test[skeleton_fields[1]]
-    else
-    # Multi-field skeleton system
-        M = MultiFieldFESpace([trial[i] for i in skeleton_fields])
-        L = MultiFieldFESpace([test[i] for i in skeleton_fields])
-    end
-    M, L
+      if (length(skeleton_fields) == 1)
+      # Single-field skeleton system
+          M = trial[skeleton_fields[1]]
+          L = test[skeleton_fields[1]]
+      else
+      # Multi-field skeleton system
+          M = MultiFieldFESpace([trial[i] for i in skeleton_fields])
+          L = MultiFieldFESpace([test[i] for i in skeleton_fields])
+      end
+      M, L
 end
 
 Gridap.FESpaces.get_test(feop::HybridAffineFEOperator) = feop.test
@@ -109,7 +109,7 @@ function _compute_hybridizable_from_skeleton_free_dof_values(skeleton_fe_functio
 
   # Convert dof-wise dof values of lh into cell-wise dof values lhₖ
     Γ = first(keys(matvec.dict))
-    Gridap.Helpers.@check isa(Γ, SkeletonTriangulation)
+    Gridap.Helpers.@check isa(Γ, GridapHybrid.SkeletonTriangulation) || isa(Γ, GridapHybrid.SkeletonView)
     lhₖ = get_cell_dof_values(skeleton_fe_function, Γ)
 
   # Compute cell-wise dof values of bulk fields out of lhₖ
@@ -147,6 +147,7 @@ function _compute_hybridizable_from_skeleton_free_dof_values(skeleton_fe_functio
     uhphₖ = lazy_map(RestrictArrayBlockMap(bulk_fields), uhphlhₖ)
 
     free_dof_values = assemble_vector(assem, ([lhₑ,uhphₖ], [lhₑ_dofs,uhph_dofs]))
+    return free_dof_values
 end
 
 function _get_cell_wise_facets(model::DiscreteModel)
@@ -317,12 +318,12 @@ function _merge_bulk_and_skeleton_matrix_contributions(matcontribs)
 end
 
 function _find_skeleton(dc::DomainContribution)
-    [trian for trian in keys(dc.dict) if isa(trian, SkeletonTriangulation)]
+    [trian for trian in keys(dc.dict) if ( isa(trian, SkeletonTriangulation) || isa(trian, SkeletonView) )] 
 end
 
 function _find_bulk(D, dc::DomainContribution)
     [trian for trian in keys(dc.dict)
-     if isa(trian, Triangulation{D}) && !(isa(trian, SkeletonTriangulation))]
+     if ( isa(trian, Triangulation{D}) && ( !(isa(trian, SkeletonTriangulation)) || !(isa(trian, SkeletonView)) ) )] 
 end
 
 function _find_boundary(dc::DomainContribution)
@@ -330,11 +331,12 @@ function _find_boundary(dc::DomainContribution)
      if isa(trian, BoundaryTriangulation)]
 end
 
+# SkeletonView is a const defined in HybridDistributed.jl to facilitate parallelization of GridapHybrid
 function _add_static_condensation(matvec, bulk_fields, skeleton_fields)
     Gridap.Helpers.@check length(keys(matvec.dict)) == 1
     _matvec = DomainContribution()
     for (trian, t) in matvec.dict
-        Gridap.Helpers.@check isa(trian, SkeletonTriangulation)
+         Gridap.Helpers.@check isa(trian, SkeletonTriangulation) || isa(trian, GridapHybrid.SkeletonView)    
         _matvec.dict[trian] = lazy_map(StaticCondensationMap(bulk_fields, skeleton_fields), t)
     end
     _matvec
