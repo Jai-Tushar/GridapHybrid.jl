@@ -3,6 +3,8 @@ using Base: _Set, ArithmeticRounds
 using Gridap
 using FillArrays
 using LinearAlgebra
+using PartitionedArrays
+using GridapDistributed
 
 using Gridap.Fields
 include("StaticCondensationMap.jl")
@@ -55,5 +57,7 @@ export ReconstructionFEOperator
 export ProjectionFEOperator
 export SingleValued
 export MultiValued
+
+include("HybridDistributed.jl")
 
 end # module

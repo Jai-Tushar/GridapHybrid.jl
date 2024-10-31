@@ -1,10 +1,10 @@
 struct HybridAffineFEOperator{TB,TS} <: FEOperator
     weakform::Function
-    trial::MultiFieldFESpace
-    test::MultiFieldFESpace
+    trial::Union{MultiFieldFESpace, GridapDistributed.DistributedMultiFieldFESpace}
+    test::Union{MultiFieldFESpace, GridapDistributed.DistributedMultiFieldFESpace}
     bulk_fields::TB
     skeleton_fields::TS
-    skeleton_op::AffineFEOperator
+    skeleton_op::Union{AffineFEOperator, AbstractArray{AffineFEOperator}}
 end
 
 function HybridAffineFEOperator(
