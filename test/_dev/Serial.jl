@@ -103,6 +103,44 @@ end
   R = setup_reconstruction_operator(model, order, dΩ, d∂K)
   P = setup_projection_operator(U,V,R,dΩ,d∂K)
 
+  xh = get_trial_fe_basis(U)
+  yh = get_fe_basis(V)
+  
+  xK_x∂K = R(xh)
+
+ @enter xK_x∂K_ΠK,xK_x∂K_Π∂K=P(xh)
+
+  basis_style = GridapHybrid._get_basis_style(xh)
+  LHSf,RHSf = GridapHybrid._evaluate_forms(R,xh)
+  cell_dofs = GridapHybrid._compute_cell_dofs(LHSf, RHSf)
+  O = R.test_space
+  GridapHybrid._generate_image_space_span(R,O,xh,cell_dofs,basis_style)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   function r(u,v)
       uK_u∂K=R(u)
       vK_v∂K=R(v)

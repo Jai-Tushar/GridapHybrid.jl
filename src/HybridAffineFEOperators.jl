@@ -346,7 +346,7 @@ function _merge_bulk_and_skeleton_matrix_contributions(matcontribs)
 end
 
 function _find_skeleton(dc::DomainContribution)
-    [trian for trian in keys(dc.dict) if isa(trian, SkeletonTriangulation)]
+    [trian for trian in keys(dc.dict) if isa(trian, SkeletonTriangulation) || isa(trian, GridapHybrid.SkeletonView)]
 end
 
 function _find_bulk(D, dc::DomainContribution)

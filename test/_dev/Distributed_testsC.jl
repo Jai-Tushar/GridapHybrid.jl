@@ -1,5 +1,3 @@
-
-
 using Gridap
 using Gridap.Geometry, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.CellData, Gridap.FESpaces
 using GridapHybrid
@@ -118,17 +116,80 @@ f(x) = -Δ(u)(x)
 
   # R = ReconstructionFEOperator((m,n), UU, VV)
 
-  
-  R = map(local_views(model), local_views(dΩ), local_views(d∂K)) do m, dΩi, d∂Ki
-      setup_reconstruction_operator(m, order, dΩi, d∂Ki)
+  function setup_reconstruction_operator(model::GridapDistributed.GenericDistributedDiscreteModel, 
+    order, dΩ::GridapDistributed.DistributedMeasure, d∂K::GridapDistributed.DistributedMeasure)
+    R = map(local_views(model), local_views(dΩ), local_views(d∂K)) do m, dΩi, d∂Ki
+        setup_reconstruction_operator(m, order, dΩi, d∂Ki)
+    end
+    return R
   end
 
-  P = map(local_views(U), local_views(V), local_views(R), local_views(dΩ), local_views(d∂K))  do Ui, Vi, Ri, dΩi, d∂Ki
-      setup_projection_operator(Ui, Vi, Ri, dΩi, d∂Ki)
-  end 
+  R = setup_reconstruction_operator(model, order, dΩ, d∂K)
 
-  # R = setup_reconstruction_operator(model, order, dΩ, d∂K)
-  # P = setup_projection_operator(U,V,R,dΩ,d∂K)
+  function setup_projection_operator(trial::GridapDistributed.DistributedMultiFieldFESpace, 
+    test::GridapDistributed.DistributedMultiFieldFESpace, R::AbstractArray{<:ReconstructionFEOperator},
+    dΩ::GridapDistributed.DistributedMeasure, d∂K::GridapDistributed.DistributedMeasure)
+    P = map(local_views(trial), local_views(test), local_views(R), local_views(dΩ), local_views(d∂K)) do triali, testi, Ri, dΩi, d∂Ki
+        setup_projection_operator(triali, testi, Ri, dΩi, d∂Ki)
+    end
+    return P
+  end
+
+
+  P = setup_projection_operator(U, V, R, dΩ, d∂K)
+
+  # P = map(local_views(U), local_views(V), local_views(R), local_views(dΩ), local_views(d∂K))  do Ui, Vi, Ri, dΩi, d∂Ki
+  #     setup_projection_operator(Ui, Vi, Ri, dΩi, d∂Ki)
+  # end 
+
+  xh = get_trial_fe_basis(U);
+  yh = get_fe_basis(V);
+
+  function (op::AbstractArray{<:ReconstructionFEOperator})(v::GridapDistributed.DistributedMultiFieldCellField) 
+    
+    image_span = map(local_views(op), local_views(v)) do opi, vi
+
+      basis_style = GridapHybrid._get_basis_style(vi)
+      LHSf, RHSf = GridapHybrid._evaluate_forms(opi, vi)
+      cell_dofs = GridapHybrid._compute_cell_dofs(LHSf, RHSf)
+      O = opi.test_space
+      GridapHybrid._generate_image_space_span(opi,O,vi,cell_dofs,basis_style)
+
+    end
+    return image_span
+  end
+
+  xK_x∂K = R(xh)
+  yK_y∂K = R(yh)
+
+  
+  function (op::AbstractArray{<:ProjectionFEOperator})(v::GridapDistributed.DistributedMultiFieldCellField)
+    
+    basis_style = _get_basis_style(v)
+    LHSf,RHSf= _evaluate_forms(op,v)
+    cell_dofs= _compute_cell_dofs(LHSf,RHSf)
+    # We get the test space so that we don't deal with
+    # the transpose underlying the trial basis
+    O = op.test_space
+    _generate_image_space_span(op,O,v,cell_dofs,basis_style)
+  end
+
+
+
+  xK_x∂K_ΠK,xK_x∂K_Π∂K=P(xh)
+ 
+
+  xh1 = local_views(xh).items[1];
+  P1  = local_views(P).items[1]; 
+
+
+  basis_style = GridapHybrid._get_basis_style(xh1)
+  @enter LHSf, RHSf = GridapHybrid._evaluate_forms(P1, xh1)
+  # cell_dofs = GridapHybrid._compute_cell_dofs(LHSf, RHSf)
+  # O = R1.test_space
+  # GridapHybrid._generate_image_space_span(R1,O,xh1,cell_dofs,basis_style)
+
+  biform, liform  = weakform(xh, yh)
 
   function r(u,v,dΩ)
       uK_u∂K=R(u)
