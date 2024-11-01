@@ -81,7 +81,11 @@ order=1
     l((vh,qh,mh)) = ∫( vh⋅f + qh*(∇⋅u))*dΩ
 
     op=HybridAffineFEOperator((u,v)->(a(u,v),l(v)), X, Y, [1,2], [3])
-    # xh=solve(op)
+
+    A = op.skeleton_op.op.matrix;
+    b = op.skeleton_op.op.vector;
+    # # xh=solve(op)
+    
     lh = solve(op.skeleton_op)
 
     uu = get_trial_fe_basis(op.trial)
@@ -90,12 +94,22 @@ order=1
 
     obiform, oliform = GridapHybrid._merge_bulk_and_skeleton_contributions(biform, liform)
     matvec, _, _ = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
-    Γ = first(keys(matvec.dict))
-    Gridap.Helpers.@check isa(Γ, GridapHybrid.SkeletonTriangulation) || isa(Γ, GridapHybrid.SkeletonView)
-    lhₖ = get_cell_dof_values(lh, Γ)
-    t = matvec.dict[Γ]
-    m = BackwardStaticCondensationMap(op.bulk_fields, op.skeleton_fields)
-    @enter uhphlhₖ = lazy_map(m, t, lhₖ)
+    
+    @enter values = GridapHybrid._compute_hybridizable_from_skeleton_free_dof_values(lh,
+                                                             op.trial,
+                                                             op.test,
+                                                             Gridap.FESpaces.get_trial(op.skeleton_op),
+                                                             matvec,
+                                                             op.bulk_fields,
+                                                             op.skeleton_fields)
+    
+    
+    # Γ = first(keys(matvec.dict))
+    # Gridap.Helpers.@check isa(Γ, GridapHybrid.SkeletonTriangulation) || isa(Γ, GridapHybrid.SkeletonView)
+    # @enter lhₖ = get_cell_dof_values(lh, Γ)
+    # t = matvec.dict[Γ]
+    # m = BackwardStaticCondensationMap(op.bulk_fields, op.skeleton_fields)
+    # @enter uhphlhₖ = lazy_map(m, t, lhₖ)
     
     
     

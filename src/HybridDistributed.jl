@@ -122,33 +122,32 @@ function HybridAffineFEOperator(
     skeleton_fields::TS) where {TB <: Vector{<:Integer},TS <: Vector{<:Integer}}
   
     # Invoke weak form of the hybridizable system
-      u = get_trial_fe_basis(trial)
-      v = get_fe_basis(test)
-      biform, liform  = weakform(u, v)
+    u = get_trial_fe_basis(trial)
+    v = get_fe_basis(test)
+    biform, liform  = weakform(u, v)
   
-      M, L = GridapHybrid._setup_fe_spaces_skeleton_system(trial, test, skeleton_fields)
+    M, L = GridapHybrid._setup_fe_spaces_skeleton_system(trial, test, skeleton_fields)
       
     # Transform DomainContribution objects of the hybridizable system into a
     # suitable form for assembling the linear system defined on the skeleton
     # (i.e., the hybrid system)
-      data = map(local_views(biform), local_views(liform),local_views(M),local_views(L)) do biform, liform, M, L
-          obiform, oliform = GridapHybrid._merge_bulk_and_skeleton_contributions(biform, liform)
-      # Pair LHS and RHS terms associated to SkeletonTriangulation
-          matvec, mat, vec = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
-      # Add StaticCondensationMap to matvec terms
-          matvec = GridapHybrid._add_static_condensation(matvec, bulk_fields, skeleton_fields)
+    data = map(local_views(biform), local_views(liform),local_views(M),local_views(L)) do biform, liform, M, L
+        obiform, oliform = GridapHybrid._merge_bulk_and_skeleton_contributions(biform, liform)
+        # Pair LHS and RHS terms associated to SkeletonTriangulation
+        matvec, mat, vec = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
+        # Add StaticCondensationMap to matvec terms
+        matvec = GridapHybrid._add_static_condensation(matvec, bulk_fields, skeleton_fields)
   
           if (length(skeleton_fields) != 1)
               matvec = GridapHybrid._block_skeleton_system_contributions(matvec, L)
           end
   
-          # uhd = GridapHybrid.attach_zero(M)
           uhd = zero(M)
           matvec, mat = Gridap.FESpaces._attach_dirichlet(matvec, mat, uhd)
   
           data = Gridap.FESpaces._collect_cell_matrix_and_vector(M, L, matvec, mat, vec)
           return data
-      end 
+    end 
   
       assem = SparseMatrixAssembler(M, L)
       A, b = assemble_matrix_and_vector(assem, data)
@@ -158,36 +157,36 @@ function HybridAffineFEOperator(
 end
   
 
-# solve for distributed hybrid models
-function Gridap.FESpaces.solve!(uh::GridapDistributed.DistributedMultiFieldCellField, solver::LinearFESolver, op::HybridAffineFEOperator, cache)
-    # Solve linear system defined on the skeleton
-      lh = solve(op.skeleton_op)
+# # solve for distributed hybrid models
+# function Gridap.FESpaces.solve!(uh::GridapDistributed.DistributedMultiFieldCellField, solver::LinearFESolver, op::HybridAffineFEOperator, cache)
+#     # Solve linear system defined on the skeleton
+#       lh = solve(op.skeleton_op)
   
-    # Invoke weak form of the hybridizable system
-      u = get_trial_fe_basis(op.trial)
-      v = get_fe_basis(op.test)
-      biform, liform  = op.weakform(u, v)
+#     # Invoke weak form of the hybridizable system
+#       u = get_trial_fe_basis(op.trial)
+#       v = get_fe_basis(op.test)
+#       biform, liform  = op.weakform(u, v)
   
-    # Transform DomainContribution objects of the hybridizable system into a
-    # suitable form for assembling the linear system defined on the skeleton
-    # (i.e., the hybrid system)
-      obiform, oliform = _merge_bulk_and_skeleton_contributions(biform, liform)
+#     # Transform DomainContribution objects of the hybridizable system into a
+#     # suitable form for assembling the linear system defined on the skeleton
+#     # (i.e., the hybrid system)
+#       obiform, oliform = _merge_bulk_and_skeleton_contributions(biform, liform)
   
-    # Pair LHS and RHS terms associated to SkeletonTriangulation
-      matvec, _, _ = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
+#     # Pair LHS and RHS terms associated to SkeletonTriangulation
+#       matvec, _, _ = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
   
-      free_dof_values = _compute_hybridizable_from_skeleton_free_dof_values(
-                      lh,
-                      op.trial,
-                      op.test,
-                      Gridap.FESpaces.get_trial(op.skeleton_op),
-                      matvec,
-                      op.bulk_fields,
-                      op.skeleton_fields)
+#       free_dof_values = _compute_hybridizable_from_skeleton_free_dof_values(
+#                       lh,
+#                       op.trial,
+#                       op.test,
+#                       Gridap.FESpaces.get_trial(op.skeleton_op),
+#                       matvec,
+#                       op.bulk_fields,
+#                       op.skeleton_fields)
   
-      cache = nothing
-      FEFunction(op.trial, free_dof_values), cache
-end
+#       cache = nothing
+#       FEFunction(op.trial, free_dof_values), cache
+# end
 
 
 
