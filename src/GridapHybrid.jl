@@ -40,6 +40,6 @@ include("GridapAPIExtensions.jl")
 include("GridapTmpModifications.jl")
 
 # Distributed machinery
-include("HybridDistributed.jl")
+include("DistributedHybrid.jl")
 
 end # module

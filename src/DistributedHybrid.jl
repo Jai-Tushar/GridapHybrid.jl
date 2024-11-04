@@ -1,4 +1,6 @@
-# Hybrid distributed model machinery 
+
+
+# Hybrid distributed model 
 function GridapHybrid.Skeleton(model::GridapDistributed.DistributedDiscreteModel)
     cell_ids = get_cell_gids(model)
     trians = map(local_views(model),partition(cell_ids)) do model, indices
@@ -157,36 +159,105 @@ function HybridAffineFEOperator(
 end
   
 
-# # solve for distributed hybrid models
-# function Gridap.FESpaces.solve!(uh::GridapDistributed.DistributedMultiFieldCellField, solver::LinearFESolver, op::HybridAffineFEOperator, cache)
-#     # Solve linear system defined on the skeleton
-#       lh = solve(op.skeleton_op)
+# solve function for hybrid distributed models
+function Gridap.FESpaces.solve!(uh::GridapDistributed.DistributedMultiFieldCellField, solver::LinearFESolver, op::HybridAffineFEOperator, cache)
+    # Solve linear system defined on the skeleton
+      lh = solve(op.skeleton_op)
   
-#     # Invoke weak form of the hybridizable system
-#       u = get_trial_fe_basis(op.trial)
-#       v = get_fe_basis(op.test)
-#       biform, liform  = op.weakform(u, v)
+    # Invoke weak form of the hybridizable system
+      u = get_trial_fe_basis(op.trial)
+      v = get_fe_basis(op.test)
+      biform, liform  = op.weakform(u, v)
   
-#     # Transform DomainContribution objects of the hybridizable system into a
-#     # suitable form for assembling the linear system defined on the skeleton
-#     # (i.e., the hybrid system)
-#       obiform, oliform = _merge_bulk_and_skeleton_contributions(biform, liform)
+    # Transform DomainContribution objects of the hybridizable system into a
+    # suitable form for assembling the linear system defined on the skeleton
+    # (i.e., the hybrid system) and pair LHS and RHS terms associated to 
+    # SkeletonTriangulation
+    matvec = map(local_views(biform), local_views(liform)) do biformi, liformi
+      obiform, oliform = GridapHybrid._merge_bulk_and_skeleton_contributions(biformi, liformi)
+      matvec, _, _ = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
+      return matvec
+    end
   
-#     # Pair LHS and RHS terms associated to SkeletonTriangulation
-#       matvec, _, _ = Gridap.FESpaces._pair_contribution_when_possible(obiform, oliform)
-  
-#       free_dof_values = _compute_hybridizable_from_skeleton_free_dof_values(
-#                       lh,
-#                       op.trial,
-#                       op.test,
-#                       Gridap.FESpaces.get_trial(op.skeleton_op),
-#                       matvec,
-#                       op.bulk_fields,
-#                       op.skeleton_fields)
-  
-#       cache = nothing
-#       FEFunction(op.trial, free_dof_values), cache
-# end
+    free_dof_values = GridapHybrid._compute_hybridizable_from_skeleton_free_dof_values(
+                      lh,
+                      op.trial,
+                      op.test,
+                      local_views(Gridap.FESpaces.get_trial(op.skeleton_op)),
+                      matvec,
+                      op.bulk_fields,
+                      op.skeleton_fields)
+      
+      ids = partition(get_free_dof_ids(op.trial))
+      xh  =  FEFunction(op.trial, PVector(free_dof_values,ids))              
+      cache = nothing
+      return xh, cache
+end
+
+function GridapHybrid._compute_hybridizable_from_skeleton_free_dof_values(
+                        skeleton_fe_function::GridapDistributed.DistributedCellField,
+                        trial_hybridizable::GridapDistributed.DistributedMultiFieldFESpace,
+                        test_hybridizable::GridapDistributed.DistributedMultiFieldFESpace,
+                        trial_skeleton,
+                        matvec::AbstractArray{<:DomainContribution},
+                        bulk_fields::Vector{Int},
+                        skeleton_fields::Vector{Int})
+
+    free_dof_values = map(local_views(skeleton_fe_function), local_views(trial_hybridizable), local_views(test_hybridizable), local_views(matvec)) do skeleton_fe_function, trial_hybridizable, test_hybridizable, matvec
+
+                                        
+        # Convert dof-wise dof values of lh into cell-wise dof values lhₖ
+        Γ = first(keys(matvec.dict))
+        Gridap.Helpers.@check isa(Γ, GridapHybrid.SkeletonTriangulation) || isa(Γ, GridapHybrid.SkeletonView)
+        lhₖ = get_cell_dof_values(skeleton_fe_function, Γ)
+                        
+        # Compute cell-wise dof values of bulk fields out of lhₖ
+        t = matvec.dict[Γ]
+        m = BackwardStaticCondensationMap(bulk_fields, skeleton_fields)
+        uhphlhₖ = lazy_map(m, t, lhₖ)
+                        
+        model = get_background_model(Γ)
+        cell_wise_facets_parent = GridapHybrid._get_cell_wise_facets(model)
+        cell_wise_facets = Gridap.Geometry.restrict(cell_wise_facets_parent, Γ.cell_to_parent_cell) #
+        cells_around_facets_parent = GridapHybrid._get_cells_around_facets(model)
+                        
+        nfields = length(bulk_fields) + length(skeleton_fields)
+        m = Gridap.Fields.BlockMap(nfields, skeleton_fields)
+        L = Gridap.FESpaces.get_fe_space(skeleton_fe_function)
+        lhₑ = lazy_map(m,
+                        GridapHybrid.convert_cell_wise_dofs_array_to_facet_dofs_array(
+                        cells_around_facets_parent,
+                        cell_wise_facets_parent,
+                        lhₖ,
+                        get_cell_dof_ids(L))...)
+        lhₑ = Gridap.Geometry.restrict(lhₑ, collect(1:length(unique(vcat(cell_wise_facets...)))))            
+                        
+        lhₑ_dofs = Gridap.FESpaces.get_cell_dof_ids(trial_hybridizable, get_triangulation(L))
+        lhₑ_dofs = lazy_map(m, lhₑ_dofs.args[skeleton_fields]...)
+        lhₑ_dofs = Gridap.Geometry.restrict(lhₑ_dofs,unique(vcat(cell_wise_facets...)))
+                        
+        Ω = trial_hybridizable[first(bulk_fields)]
+        Ω = get_triangulation(Ω)
+                        
+        m = Gridap.Fields.BlockMap(length(bulk_fields), bulk_fields)
+        uhph_dofs = get_cell_dof_ids(trial_hybridizable, Ω)
+                          
+        # This last step is needed as get_cell_dof_ids(...) returns as many blocks
+        # as fields in trial, regardless of the FEspaces defined on Ω or not
+        uhph_dofs = lazy_map(m, uhph_dofs.args[bulk_fields]...)
+        uhph_dofs = Gridap.Geometry.restrict(uhph_dofs,Γ.cell_to_parent_cell)
+                                   
+        uhphₖ = lazy_map(RestrictArrayBlockMap(bulk_fields), uhphlhₖ)             
+        vecdata = ([lhₑ,uhphₖ], [lhₑ_dofs,uhph_dofs])
+                        
+        assem = SparseMatrixAssembler(trial_hybridizable, test_hybridizable)
+        free_dof_values = assemble_vector(assem, vecdata)       
+        return free_dof_values          
+    end    
+end
+
+
+
 
 
 
