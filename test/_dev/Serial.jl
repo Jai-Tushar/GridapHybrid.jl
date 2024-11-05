@@ -1,5 +1,3 @@
-# module DarcyDistributedHDGConvgTests
-
 using Gridap
 using Gridap.Geometry, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.CellData, Gridap.FESpaces
 using GridapHybrid
@@ -45,7 +43,7 @@ function setup_projection_operator(UK_U∂K,VK_V∂K,R,dΩ,d∂K)
     ∫(vK*(urK-uK))dΩ +      # bulk projection terms
       ∫(v∂K*(urK-u∂K))d∂K   # skeleton projection terms
   end
-  GridapHybrid.ProjectionFEOperator((m,n),UK_U∂K,VK_V∂K)
+  GridapHybrid.ProjectionFEOperator((m,n),UK_U∂K,VK_V∂K,R)
 end
 
 
@@ -106,12 +104,42 @@ end
   xh = get_trial_fe_basis(U)
   yh = get_fe_basis(V)
   
+  basis_style = GridapHybrid._get_basis_style(xh)
+
+  LHSf, RHSf = GridapHybrid._evaluate_forms(P, xh)
+
+  trial = GridapHybrid._to_trial_basis(xh)
+  test  = GridapHybrid._get_test_fe_basis(P)
+
+  urK_ur∂K = R(trial)
+  urK,ur∂K = urK_ur∂K
+  uK,u∂K   = trial
+  vK,v∂K   = test 
+  # ∫(vK*(urK-uK))dΩ+∫(vK*ur∂K)dΩ -                 # bulk projection terms
+  #    ∫(v∂K*urK)d∂K+∫(v∂K*u∂K)d∂K-∫(v∂K*ur∂K)d∂K   # skeleton projection terms
+  ∫(vK*(urK-uK))dΩ
+  ∫(vK*ur∂K)dΩ                 # bulk projection terms
+  ∫(v∂K*urK)d∂K
+  ∫(v∂K*u∂K)d∂K
+  ∫(v∂K*ur∂K)d∂K
+
+
+
+
+
+
+
+
   xK_x∂K = R(xh)
 
  @enter xK_x∂K_ΠK,xK_x∂K_Π∂K=P(xh)
 
-  basis_style = GridapHybrid._get_basis_style(xh)
-  LHSf,RHSf = GridapHybrid._evaluate_forms(R,xh)
+
+trial = GridapHybrid._to_trial_basis(xh)
+test  = GridapHybrid._get_test_fe_basis(P) 
+@enter RHS_contribs = P.RHS_form(trial, test)
+
+  @enter LHSf,RHSf = GridapHybrid._evaluate_forms(P,xh)
   cell_dofs = GridapHybrid._compute_cell_dofs(LHSf, RHSf)
   O = R.test_space
   GridapHybrid._generate_image_space_span(R,O,xh,cell_dofs,basis_style)

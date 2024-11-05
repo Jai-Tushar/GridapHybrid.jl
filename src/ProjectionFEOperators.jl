@@ -1,14 +1,46 @@
 
-struct ProjectionFEOperator{T1,T2,T3,T4} <: GridapType
+# struct ProjectionFEOperator{T1,T2,T3,T4} <: GridapType
+#   LHS_form               :: T1
+#   RHS_form               :: T2
+#   trial_space            :: T3
+#   test_space             :: T4
+#   LHS_contribs           :: Gridap.CellData.DomainContribution
+
+#   function ProjectionFEOperator(weakform,
+#                            trial_space :: A,
+#                            test_space  :: B) where {A,B}
+
+#      us = get_trial_fe_basis(trial_space)
+#      vs = get_fe_basis(test_space)
+
+#      LHS_form, RHS_form = weakform
+#      LHS_contribs       = LHS_form(us,vs)
+
+#      T1=typeof(LHS_form)
+#      T2=typeof(RHS_form)
+#      T3=typeof(trial_space)
+#      T4=typeof(test_space)
+#      new{T1,T2,T3,T4}(LHS_form,
+#                       RHS_form,
+#                       trial_space,
+#                       test_space,
+#                       LHS_contribs)
+#   end
+# end
+
+# Adding the flexibility to pass an operator to the constructor.
+struct ProjectionFEOperator{T1,T2,T3,T4,T5} <: GridapType
   LHS_form               :: T1
   RHS_form               :: T2
   trial_space            :: T3
   test_space             :: T4
   LHS_contribs           :: Gridap.CellData.DomainContribution
+  Operator               :: GridapHybrid.ReconstructionFEOperator
 
   function ProjectionFEOperator(weakform,
                            trial_space :: A,
-                           test_space  :: B) where {A,B}
+                           test_space  :: B,
+                           Operator    :: C) where {A,B,C}
 
      us = get_trial_fe_basis(trial_space)
      vs = get_fe_basis(test_space)
@@ -20,11 +52,13 @@ struct ProjectionFEOperator{T1,T2,T3,T4} <: GridapType
      T2=typeof(RHS_form)
      T3=typeof(trial_space)
      T4=typeof(test_space)
-     new{T1,T2,T3,T4}(LHS_form,
+     T5=typeof(Operator)
+     new{T1,T2,T3,T4,T5}(LHS_form,
                       RHS_form,
                       trial_space,
                       test_space,
-                      LHS_contribs)
+                      LHS_contribs,
+                      Operator)
   end
 end
 

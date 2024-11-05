@@ -932,3 +932,29 @@ function Gridap.Arrays.evaluate!(cache,
   gx=evaluate!(cache,k,v,fx.matrix)
   Gridap.Fields.TransposeFieldIndices(gx)
 end
+
+#
+# When we do local operation like uK_u∂K = Reconstruction_operator(trial::MultiFieldCellField) where,
+# uK_u∂K is associated with a different object id for example, a view of the triangulation or
+# distributed setup, then cell_field operations like vK*ur∂K break, where vK, v∂K = test::MultiFieldCellField.
+# An @assert of type-instable is triggered by the lazy_map of PosNegReindex, because the negative crap 
+# created is not of the same type as other entries in the array which the lazy_map requires. The following fixes this
+# type-instability issue for triangulations with different object ids. Moreover, it is more general in the sense that
+# the arguments to this map 
+# cell_dofs_current_field=lazy_map(x->view(x,:,view_range),cell_dofs)
+# need not be UnitRange{Int64}.
+
+function Geometry.pos_neg_data(
+  ipos_to_val::AbstractArray{<:SubArray{<:Number}},i_to_iposneg::PosNegPartition
+)
+  zero_indices(::UnitRange{T}) where T = one(T):one(T)
+  zero_indices(::AbstractArray{T}) where T = T[]
+  nineg = length(i_to_iposneg.ineg_to_i)
+  val = testitem(ipos_to_val)
+  zs = 0 .* size(val.parent)
+  void_parent = similar(val.parent,eltype(val),zs)
+  void_ids = map(zero_indices, val.indices)
+  void = SubArray(void_parent,void_ids)
+  ineg_to_val = Fill(void,nineg)
+  ipos_to_val, ineg_to_val
+end

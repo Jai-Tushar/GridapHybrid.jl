@@ -58,6 +58,6 @@ export ProjectionFEOperator
 export SingleValued
 export MultiValued
 
-include("HybridDistributed.jl")
+include("DistributedHybrid.jl")
 
 end # module

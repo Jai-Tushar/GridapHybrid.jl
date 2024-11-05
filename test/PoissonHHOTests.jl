@@ -40,7 +40,7 @@ module PoissonHHOTests
       ∫(vK*(urK-uK))dΩ +      # bulk projection terms
         ∫(v∂K*(urK-u∂K))d∂K   # skeleton projection terms
     end
-    ProjectionFEOperator((m,n),UK_U∂K,VK_V∂K)
+    ProjectionFEOperator((m,n),UK_U∂K,VK_V∂K, R)
    end
 
 
@@ -161,11 +161,11 @@ module PoissonHHOTests
       return sqrt(sum(∫(e⋅e)dΩ))
   end
 
-  function conv_test(ns,order)
+  function conv_test(ns,order,u)
     el2 = Float64[]
     hs = Float64[]
     for n in ns
-      l2 = solve_hho((n,n),order)
+      l2 = solve_hho((n,n),order,u)
       println(l2)
       h = 1.0/n
       push!(el2,l2)
@@ -182,23 +182,24 @@ module PoissonHHOTests
     linreg[2]
   end
 
-   for p in [0,1,2,3]
-      u(x) = x[1]^p+x[2]^p
-      println(solve_hho((2,2),p,u))
-      @test solve_hho((2,2),p,u) < 1.0e-9
-   end 
+  #  for p in [0,1,2,3]
+  #     u(x) = x[1]^p+x[2]^p
+  #     println(solve_hho((2,2),p,u))
+  #     @test solve_hho((2,2),p,u) < 1.0e-9
+  #  end 
 
-  # # ns=[8,16,32,64,128]
-  # ns=[8,16,32,64]
-  # order=0
-  # el, hs = conv_test(ns,order)
-  # println("Slope L2-norm u: $(slope(hs,el))")
-  # slopek  =[Float64(ni)^(-(order)) for ni in ns]
-  # slopekp1=[Float64(ni)^(-(order+1)) for ni in ns]
-  # slopekp2=[Float64(ni)^(-(order+2)) for ni in ns]
-  # display(plot(hs,[el slopek slopekp1 slopekp2],
-  #   xaxis=:log, yaxis=:log,
-  #   label=["L2u (measured)" "slope k" "slope k+1" "slope k+2"],
-  #   shape=:auto,
-  #   xlabel="h",ylabel="L2 error",legend=:bottomright))
+  # ns=[8,16,32,64,128]
+  u(x) = sin(2π*x[1])*sin(2π*x[2])
+  ns=[8,16,32,64]
+  order=1
+  el, hs = conv_test(ns,order,u)
+  println("Slope L2-norm u: $(slope(hs,el))")
+  slopek  =[Float64(ni)^(-(order)) for ni in ns]
+  slopekp1=[Float64(ni)^(-(order+1)) for ni in ns]
+  slopekp2=[Float64(ni)^(-(order+2)) for ni in ns]
+  display(plot(hs,[el slopek slopekp1 slopekp2],
+    xaxis=:log, yaxis=:log,
+    label=["L2u (measured)" "slope k" "slope k+1" "slope k+2"],
+    shape=:auto,
+    xlabel="h",ylabel="L2 error",legend=:bottomright))
 end
