@@ -350,8 +350,8 @@ function _find_skeleton(dc::DomainContribution)
 end
 
 function _find_bulk(D, dc::DomainContribution)
-    [trian for trian in keys(dc.dict)
-     if isa(trian, Triangulation{D,D}) && !(isa(trian, SkeletonTriangulation))]
+     [trian for trian in keys(dc.dict)
+         if ( isa(trian, Triangulation{D}) && ( !(isa(trian, SkeletonTriangulation)) || !(isa(trian, SkeletonView)) ) )]   
 end
 
 function _find_boundary(dc::DomainContribution)
@@ -363,7 +363,7 @@ function _add_static_condensation(matvec, bulk_fields, skeleton_fields)
     Gridap.Helpers.@check length(keys(matvec.dict)) == 1
     _matvec = DomainContribution()
     for (trian, t) in matvec.dict
-        Gridap.Helpers.@check isa(trian, SkeletonTriangulation)
+        Gridap.Helpers.@check isa(trian, SkeletonTriangulation) || isa(trian, GridapHybrid.SkeletonView)
         _matvec.dict[trian] = lazy_map(StaticCondensationMap(bulk_fields, skeleton_fields), t)
     end
     _matvec

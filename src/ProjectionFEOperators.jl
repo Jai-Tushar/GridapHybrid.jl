@@ -28,7 +28,9 @@
 #   end
 # end
 
-# Adding the flexibility to pass an operator to the constructor.
+# Adding the flexibility to pass an operator to the constructor. Without this change, explicitly computng 
+# (in the distributed setting) xK_x∂K = P(xh), where xh is the basis associaed with the hybrid space
+#  and P is the projection operator will not work.
 struct ProjectionFEOperator{T1,T2,T3,T4,T5} <: GridapType
   LHS_form               :: T1
   RHS_form               :: T2

@@ -933,7 +933,7 @@ function Gridap.Arrays.evaluate!(cache,
   Gridap.Fields.TransposeFieldIndices(gx)
 end
 
-#
+
 # When we do local operation like uK_u∂K = Reconstruction_operator(trial::MultiFieldCellField) where,
 # uK_u∂K is associated with a different object id for example, a view of the triangulation or
 # distributed setup, then cell_field operations like vK*ur∂K break, where vK, v∂K = test::MultiFieldCellField.
