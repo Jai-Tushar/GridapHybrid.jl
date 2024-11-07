@@ -93,7 +93,7 @@ module DistributedDarcyHDGTests
 
   order = 2
   np = (2,2)
-  mesh_partition = (2,2)
+  mesh_partition = (8,8)
 
   ranks = with_debug() do distribute
     distribute(LinearIndices((prod(np),)))
