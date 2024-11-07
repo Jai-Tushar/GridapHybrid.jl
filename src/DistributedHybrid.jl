@@ -1,4 +1,11 @@
-
+# In order to extend GridapHybrid to parallel via exploiting the ecosystem of GridapDistributed, we follow the
+# the following minimalistic approach.
+# We create a TriangulationView for the GridapHybrid.Skeleton and call it GridapHybrid.SkeletonView. 
+# This allows us to peek into partitions of the GridapHybrid.SkeletonTriangulation and 
+# it also stores information about its parent (which has ghosts).        
+# Whenever we need to do operations that involve "ghosts", for example integration on ceratin partition of the 
+# GridapHybrid.SkeletonTriangulation, we can use the GridapHybrid.SkeletonView's parents information to perform the operation, 
+# and finally restrict the data to the partition (without ghosts) by using Gridap.Geometry.restrict. 
 
 # Hybrid distributed model 
 function GridapHybrid.Skeleton(model::GridapDistributed.DistributedDiscreteModel)
@@ -31,7 +38,7 @@ function Gridap.Geometry.is_change_possible(strian::SkeletonView,ttrian::BodyFit
     false
 end
 
-# Keeping ReferenceDomain here due to Julia ambiguity. PhysicalDomain can be incorporated if needed.
+# Keeping ReferenceDomain here due to Julia ambiguity. PhysicalDomain can be incorporated if and when needed.
 function Gridap.CellData.change_domain(
     a::CellField,strian::GridapHybrid.SkeletonTriangulation,::ReferenceDomain,ttrian::SkeletonView,::ReferenceDomain
 )
@@ -78,7 +85,6 @@ end
 
 
 # cellwise normal vector for distributed hybrid models
-
 function GridapHybrid.get_cell_normal_vector(s::GridapDistributed.DistributedTriangulation)
     fields = map(local_views(s)) do si
         parent = get_cell_normal_vector(si.parent)
@@ -97,8 +103,8 @@ function GridapHybrid.get_cell_owner_normal_vector(s::GridapDistributed.Distribu
     GridapDistributed.DistributedCellField(fields,s)
 end
 
-# For distributed models we need to differentiate between Ωu and Ωp (they have different object ids)
-# where u and p are coming from different spaces (example velocity and pressure). The serial implementation 
+# For distributed models we need to differentiate between two different triangulation views (they have different object ids).
+# For example Ωu and Ωp where u and p are coming from different spaces (example velocity and pressure). The serial implementation 
 # does not require this differentiation.
 function Geometry.best_target(
     trian1::BodyFittedTriangulation{Dc},
@@ -112,7 +118,6 @@ function Geometry.best_target(
     glue2 = get_glue(trian2,Val(D1))
     best_target(trian1,trian2,glue1,glue2)
 end
-
 
 
 # Hybrid FE operator for distributed models
@@ -218,7 +223,7 @@ function GridapHybrid._compute_hybridizable_from_skeleton_free_dof_values(
                         
         model = get_background_model(Γ)
         cell_wise_facets_parent = GridapHybrid._get_cell_wise_facets(model)
-        cell_wise_facets = Gridap.Geometry.restrict(cell_wise_facets_parent, Γ.cell_to_parent_cell) #
+        cell_wise_facets = Gridap.Geometry.restrict(cell_wise_facets_parent, Γ.cell_to_parent_cell) 
         cells_around_facets_parent = GridapHybrid._get_cells_around_facets(model)
                         
         nfields = length(bulk_fields) + length(skeleton_fields)
