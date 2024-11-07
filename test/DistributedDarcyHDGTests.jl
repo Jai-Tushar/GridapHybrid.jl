@@ -26,16 +26,6 @@ module DistributedDarcyHDGTests
   end
 
 
-
-
-  order = 2
-  np = (4,4)
-  mesh_partition = (128,128)
-
-  ranks = with_debug() do distribute
-    distribute(LinearIndices((prod(np),)))
-  end
-
   function solve_darcy_hdg(mesh_partition, np, ranks, order)
 
   
@@ -100,6 +90,16 @@ module DistributedDarcyHDGTests
 
     @test sqrt(sum(∫(e⋅e)dΩ)) < 1.0e-12
   end
+
+  order = 2
+  np = (2,2)
+  mesh_partition = (2,2)
+
+  ranks = with_debug() do distribute
+    distribute(LinearIndices((prod(np),)))
+  end
+
+  solve_darcy_hdg(mesh_partition, np, ranks, order)
 
 end
 
